@@ -7,23 +7,23 @@ import {
   FormBuilder,
 } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
-import { CommonModule } from '@angular/common';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatRadioModule } from '@angular/material/radio';
+import { MatSnackBar, MatSnackBarHorizontalPosition, MatSnackBarVerticalPosition } from '@angular/material/snack-bar';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 
 import { ADD_DIALOG_DATA } from '../../../core/constant/dialog.constant';
 import { Hero } from '../../../core/interfaces/hero';
 import { ButtonBackComponent } from '../../../shared/button-back/button-back.component';
 import { HeroDialog } from '../../../shared/dialog/dialog.component';
 import { HeroesStore } from '../../../state/hero.store';
-import { MatSnackBar, MatSnackBarHorizontalPosition, MatSnackBarVerticalPosition } from '@angular/material/snack-bar';
 import { SnackBarPosition, SnackBarType } from '../../../core/enums/snack-bar.enum';
 import { HeroPowers } from '../../../core/enums/powers.enum';
-import { MatCheckboxModule } from '@angular/material/checkbox';
+import { UppercaseDirective } from '../../../core/directives/uppercase.directive';
 
 @Component({
   selector: 'app-add-hero',
@@ -36,9 +36,9 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
     MatButtonModule,
     MatRadioModule,
     MatCheckboxModule,
-    CommonModule,
     ButtonBackComponent,
-  ],
+    UppercaseDirective,
+],
   templateUrl: './add-hero.component.html',
   styleUrls: ['./add-hero.component.scss'],
 })

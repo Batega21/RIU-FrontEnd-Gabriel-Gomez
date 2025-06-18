@@ -1,6 +1,6 @@
 <div class="heroes-wrapper">
 
-  @for (hero of store.heroes(); track hero) {
+  @for (hero of store.heroes(); track hero.id) {
   <mat-card class="hero-card" appearance="outlined">
     <mat-card-header>
       <mat-card-title-group>

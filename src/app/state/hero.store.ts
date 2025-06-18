@@ -11,14 +11,9 @@ import {
 
 import { Hero, HeroesPaginated } from '../core/interfaces/hero';
 import { HeroService } from '../core/services/hero.service';
-import { LoggerService } from '../core/services/logger.service';
 import { delay } from 'rxjs';
 import { Pagination } from '../core/enums/pagination.enum';
 import { LocalStorageService } from '../core/services/local-storage.service';
-
-// Sources:
-// https://ngrx.io/guide/signals/signal-store
-// https://www.telerik.com/blogs/state-management-angular-applications-using-ngrx-signals-store
 
 type heroesState = {
   heroes: Hero[];
@@ -27,8 +22,8 @@ type heroesState = {
   heroesCount: number;
   page: number;
   limit: number;
-  selectedHero: Hero | null;
-  error: string | null;
+  selectedHero: Hero;
+  error: string;
 };
 
 const initialState: heroesState = {
@@ -38,8 +33,8 @@ const initialState: heroesState = {
   heroesCount: 0,
   page: Pagination.DEFAULT_PAGE,
   limit: Pagination.DEFAULT_LIMIT,
-  selectedHero: null,
-  error: null,
+  selectedHero: {} as Hero,
+  error: '',
 };
 
 export const HeroesStore = signalStore(
@@ -48,7 +43,6 @@ export const HeroesStore = signalStore(
 
   withProps(() => ({
     heroesService: inject(HeroService),
-    logger: inject(LoggerService),
     localStorageService: inject(LocalStorageService),
   })),
 
@@ -61,11 +55,22 @@ export const HeroesStore = signalStore(
     ),
   })),
 
-  withMethods(({ logger, heroesService, localStorageService, ...store }) => ({
+  withMethods(({ heroesService, localStorageService, ...store }) => ({
     getHeroesPaginated(page: number, limit: number): void {
-
-      logger.log(`Fetching paginated Heroes page: ${page}, limit: ${limit}`);
-      patchState(store, { loading: true, error: null });
+      patchState(store, { loading: true, error: '' });
+      const storedHeroes = localStorageService.getLocalHeroesPaginated(page, limit);
+      if (storedHeroes && storedHeroes.heroes.length > 0) {
+        patchState(store, {
+          heroes: storedHeroes.heroes,
+          heroesCount: storedHeroes.heroesCount,
+          loading: false,
+          initialLoad: true,
+          page: page,
+          limit: limit,
+          error: '',
+        });
+        return;
+      }
       
       heroesService
         .getHeroesPaginated(page, limit)
@@ -79,15 +84,11 @@ export const HeroesStore = signalStore(
               initialLoad: true,
               page: page,
               limit: limit,
-              error: null,
+              error: '',
             });
-            localStorageService.setHeroesInStorage(response);
-            logger.log(
-              'Heroes successfully fetched and saved to local storage.'
-            );
+            localStorageService.addHeroesInStorage(response);
           },
           error: (err) => {
-            const errorMessage = 'Error fetching heroes from API';
             patchState(store, {
               heroes: [],
               heroesCount: 0,
@@ -95,16 +96,14 @@ export const HeroesStore = signalStore(
               initialLoad: false,
               page: Pagination.DEFAULT_PAGE,
               limit: Pagination.DEFAULT_LIMIT,
-              error: errorMessage,
-              selectedHero: null,
+              error: `Error fetching heroes from API: ${err}`,
+              selectedHero: {} as Hero,
             });
-            logger.error(errorMessage, err);
           },
         });
     },
 
     getHeroesByNames(heroes: string[]): void {
-      logger.log('Fetching Heroes by names from API Service');
       patchState(store, { loading: true });
 
       heroesService.getHeroesByNames(heroes).subscribe({
@@ -124,19 +123,17 @@ export const HeroesStore = signalStore(
               heroesCount: response.heroesCount,
             })
           );
-          logger.log(
-            'Heroes successfully fetched from API and saved to local storage.'
-          );
         },
         error: (err) => {
-          logger.error('Error fetching heroes from API', err);
           patchState(store, {
-            heroes: [],
-            heroesCount: 0,
-            loading: false,
-            initialLoad: false,
-            page: Pagination.DEFAULT_PAGE,
-            limit: Pagination.DEFAULT_LIMIT,
+              heroes: [],
+              heroesCount: 0,
+              loading: false,
+              initialLoad: false,
+              page: Pagination.DEFAULT_PAGE,
+              limit: Pagination.DEFAULT_LIMIT,
+              error: `Error fetching heroes from API: ${err}`,
+              selectedHero: {} as Hero,
           });
         },
       });
@@ -147,18 +144,14 @@ export const HeroesStore = signalStore(
       const storageHeroes = JSON.parse(
         localStorage.getItem('heroes') || '{"heroes":[], "heroesCount":0}'
       );
-      logger.log('getHeroById called with id:', id);
-
-      if (storageHeroes.heroes?.length > 0) {
       const heroLocal = storageHeroes.heroes.find((hero: Hero) => hero.id == id);
-        logger.log('Heroes loaded from local storage');
+
+      if (storageHeroes.heroes?.length > 0 && heroLocal) {
         patchState(store, {
           selectedHero: heroLocal,
           loading: false,
         });
-        logger.log('Hero found:', heroLocal);
       } else {
-        logger.log('Fetching Hero from API Service');
         heroesService
           .getHeroById(id)
           .pipe(delay(1000))
@@ -168,47 +161,49 @@ export const HeroesStore = signalStore(
                 selectedHero: hero,
                 loading: false,
               });
-              logger.log('Hero found:', hero);
             },
             error: (err) => {
-              logger.error('Error fetching hero from API:', err);
-              patchState(store, { loading: false });
+              patchState(store, {
+              loading: false,
+              initialLoad: false,
+              selectedHero: {} as Hero,
+              error: `Error fetching hero from API: ${err}`,
+            });
             },
           });
       }
     },
 
     addHero(hero: Hero): void {
-      logger.log('addHero called with hero:', hero);
-      patchState(store, { loading: true, error: null });
+      patchState(store, { loading: true, error: '' });
 
       heroesService.addHero(hero).subscribe({
         next: (addedHero: Hero) => {
-          logger.log('Hero added successfully:', addedHero);
           patchState(store, {
             heroes: [...store.heroes(), addedHero],
             heroesCount: store.heroesCount() + 1,
             selectedHero: addedHero,
             initialLoad: false,
             loading: false,
-            error: null,
+            error: '',
           });
-          localStorageService.addHeroToStorage(addedHero);
+          localStorageService.updateStorage(addedHero);
         },
         error: (err) => {
-          const errorMessage = 'Error adding hero to API';
-          logger.error(errorMessage, err);
-          patchState(store, { loading: false, error: errorMessage});
+          patchState(store, {
+            loading: false,
+            initialLoad: false,
+            selectedHero: {} as Hero,
+            error: `Error adding hero: ${err}`,
+          });
         },
       });
     },
 
     updateHero(hero: Hero): void {
-      patchState(store, { loading: true });
-      logger.log('Heroes updated from local storage with hero:', hero);
-
+      patchState(store, { loading: true, error: '' });
       const storageHeroes = localStorageService
-        .getHeroesFromStorage(
+        .getLocalHeroesPaginated(
           Pagination.DEFAULT_PAGE,
           Pagination.DEFAULT_LIMIT);
 
@@ -226,69 +221,59 @@ export const HeroesStore = signalStore(
               heroesCount: storageHeroes?.heroesCount || 0,
               loading: false,
               initialLoad: false,
-              error: null,
+              error: '',
             });
-
-            logger.log('Hero updated successfully:', updatedHero);
-            patchState(store, { loading: false });
+            localStorageService.updateStorage(updatedHero);
           },
           error: (err) => {
-            logger.error('Error updating hero:', err);
-            patchState(store, { loading: false });
+            patchState(store, {
+              loading: false,
+              initialLoad: false,
+              selectedHero: {} as Hero,
+              error: `Error updating hero: ${err}`
+            });
           },
         });
     },
 
     deleteHero(id: number): void {
-      patchState(store, { loading: true });
-      logger.log('delete Hero called with id:', id);
+      patchState(store, { loading: true, error: '' });
 
       heroesService
         .deleteHero(id)
         .pipe(delay(1000))
         .subscribe({
           next: () => {
-            localStorageService.removeHeroesFromStorage(id);
-            const updatedHeroes = localStorageService.getLocalHeroes('heroes');
+            localStorageService.deleteHeroFromStorage(id);
+            const updatedHeroes = localStorageService.getStoredHeroesByKey('heroes');
+
             patchState(store, {
               heroes: updatedHeroes?.heroes || [],
               heroesCount: updatedHeroes?.heroesCount || 0,
               selectedHero: {} as Hero,
               initialLoad: false,
               loading: false,
-              error: null,
+              error: '',
             });
-            logger.log(`Hero with id ${id} deleted successfully`);
           },
           error: (err) => {
-            logger.error('Error deleting hero:', err);
-            patchState(store, { loading: false });
+            patchState(store, {
+              loading: false,
+              initialLoad: false,
+              selectedHero: {} as Hero,
+              error: `Error deleting hero: ${err}`
+            });
           },
         });
     },
   })),
 
   withHooks({
-    onInit({ logger, heroesService, ...store }) {
+    onInit({ heroesService, ...store }) {
       store.getHeroesPaginated(
         Pagination.DEFAULT_PAGE,
         Pagination.DEFAULT_LIMIT
       );
-      effect(() => {
-        if (store.initialLoad()) {
-          localStorage.setItem(
-            'heroes',
-            JSON.stringify({
-              heroes: store.heroes(),
-              heroesCount: store.heroesCount(),
-            })
-          );
-        }
-      });
-    },
-
-    onDestroy({ logger, heroesService, ...store }) {
-      logger.log('HeroesProvider destroyed');
     },
   })
 );

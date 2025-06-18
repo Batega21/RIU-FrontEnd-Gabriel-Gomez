@@ -14,7 +14,7 @@ import {
   FormBuilder,
 } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
-import { CommonModule } from '@angular/common';
+
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
@@ -39,6 +39,7 @@ import {
   SnackBarPosition,
   SnackBarType,
 } from '../../../core/enums/snack-bar.enum';
+import { UppercaseDirective } from '../../../core/directives/uppercase.directive';
 
 @Component({
   selector: 'app-edit-hero',
@@ -51,9 +52,9 @@ import {
     MatIconModule,
     MatButtonModule,
     MatCheckboxModule,
-    CommonModule,
     ButtonBackComponent,
-  ],
+    UppercaseDirective,
+],
   templateUrl: './edit-hero.component.html',
   styleUrls: ['./edit-hero.component.scss'],
 })

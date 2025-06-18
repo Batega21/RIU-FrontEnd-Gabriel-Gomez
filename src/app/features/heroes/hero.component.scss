@@ -3,7 +3,7 @@
   background-position: center;
   background-repeat: no-repeat;
   background-attachment: fixed;
-  background-color: #000;
+  background: var(--mat-sys-surface);
   background-size: contain;
   height: 100vh;
   display: flex;
@@ -16,10 +16,10 @@
 
 h1 {
   position: absolute;
-  top: 50%;
+  top: 35%;
   left: 50%;
   transform: translate(-50%, -50%);
-  font-size: 4rem;
+  font-size: 3rem;
   color: #fff;
   text-align: center;
   letter-spacing: 5rem;
@@ -49,6 +49,6 @@ h1 {
   }
   100% {
     opacity: 0;
-    letter-spacing: 8rem;
+    letter-spacing: 5rem;
   }
 }
