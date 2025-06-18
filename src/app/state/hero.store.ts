@@ -22,8 +22,8 @@ type heroesState = {
   heroesCount: number;
   page: number;
   limit: number;
-  selectedHero: Hero | null;
-  error: string | null;
+  selectedHero: Hero;
+  error: string;
 };
 
 const initialState: heroesState = {
@@ -33,8 +33,8 @@ const initialState: heroesState = {
   heroesCount: 0,
   page: Pagination.DEFAULT_PAGE,
   limit: Pagination.DEFAULT_LIMIT,
-  selectedHero: null,
-  error: null,
+  selectedHero: {} as Hero,
+  error: '',
 };
 
 export const HeroesStore = signalStore(
@@ -57,7 +57,20 @@ export const HeroesStore = signalStore(
 
   withMethods(({ heroesService, localStorageService, ...store }) => ({
     getHeroesPaginated(page: number, limit: number): void {
-      patchState(store, { loading: true, error: null });
+      patchState(store, { loading: true, error: '' });
+      const storedHeroes = localStorageService.getLocalHeroesPaginated(page, limit);
+      if (storedHeroes && storedHeroes.heroes.length > 0) {
+        patchState(store, {
+          heroes: storedHeroes.heroes,
+          heroesCount: storedHeroes.heroesCount,
+          loading: false,
+          initialLoad: true,
+          page: page,
+          limit: limit,
+          error: '',
+        });
+        return;
+      }
       
       heroesService
         .getHeroesPaginated(page, limit)
@@ -71,9 +84,9 @@ export const HeroesStore = signalStore(
               initialLoad: true,
               page: page,
               limit: limit,
-              error: null,
+              error: '',
             });
-            localStorageService.setHeroesInStorage(response);
+            localStorageService.addHeroesInStorage(response);
           },
           error: (err) => {
             patchState(store, {
@@ -84,7 +97,7 @@ export const HeroesStore = signalStore(
               page: Pagination.DEFAULT_PAGE,
               limit: Pagination.DEFAULT_LIMIT,
               error: `Error fetching heroes from API: ${err}`,
-              selectedHero: null,
+              selectedHero: {} as Hero,
             });
           },
         });
@@ -120,7 +133,7 @@ export const HeroesStore = signalStore(
               page: Pagination.DEFAULT_PAGE,
               limit: Pagination.DEFAULT_LIMIT,
               error: `Error fetching heroes from API: ${err}`,
-              selectedHero: null,
+              selectedHero: {} as Hero,
           });
         },
       });
@@ -131,9 +144,9 @@ export const HeroesStore = signalStore(
       const storageHeroes = JSON.parse(
         localStorage.getItem('heroes') || '{"heroes":[], "heroesCount":0}'
       );
-
-      if (storageHeroes.heroes?.length > 0) {
       const heroLocal = storageHeroes.heroes.find((hero: Hero) => hero.id == id);
+
+      if (storageHeroes.heroes?.length > 0 && heroLocal) {
         patchState(store, {
           selectedHero: heroLocal,
           loading: false,
@@ -153,7 +166,7 @@ export const HeroesStore = signalStore(
               patchState(store, {
               loading: false,
               initialLoad: false,
-              selectedHero: null,
+              selectedHero: {} as Hero,
               error: `Error fetching hero from API: ${err}`,
             });
             },
@@ -162,7 +175,7 @@ export const HeroesStore = signalStore(
     },
 
     addHero(hero: Hero): void {
-      patchState(store, { loading: true, error: null });
+      patchState(store, { loading: true, error: '' });
 
       heroesService.addHero(hero).subscribe({
         next: (addedHero: Hero) => {
@@ -172,15 +185,15 @@ export const HeroesStore = signalStore(
             selectedHero: addedHero,
             initialLoad: false,
             loading: false,
-            error: null,
+            error: '',
           });
-          localStorageService.addHeroToStorage(addedHero);
+          localStorageService.updateStorage(addedHero);
         },
         error: (err) => {
           patchState(store, {
             loading: false,
             initialLoad: false,
-            selectedHero: null,
+            selectedHero: {} as Hero,
             error: `Error adding hero: ${err}`,
           });
         },
@@ -188,9 +201,9 @@ export const HeroesStore = signalStore(
     },
 
     updateHero(hero: Hero): void {
-      patchState(store, { loading: true, error: null });
+      patchState(store, { loading: true, error: '' });
       const storageHeroes = localStorageService
-        .getHeroesFromStorage(
+        .getLocalHeroesPaginated(
           Pagination.DEFAULT_PAGE,
           Pagination.DEFAULT_LIMIT);
 
@@ -208,14 +221,15 @@ export const HeroesStore = signalStore(
               heroesCount: storageHeroes?.heroesCount || 0,
               loading: false,
               initialLoad: false,
-              error: null,
+              error: '',
             });
+            localStorageService.updateStorage(updatedHero);
           },
           error: (err) => {
             patchState(store, {
               loading: false,
               initialLoad: false,
-              selectedHero: null,
+              selectedHero: {} as Hero,
               error: `Error updating hero: ${err}`
             });
           },
@@ -223,29 +237,30 @@ export const HeroesStore = signalStore(
     },
 
     deleteHero(id: number): void {
-      patchState(store, { loading: true, error: null });
+      patchState(store, { loading: true, error: '' });
 
       heroesService
         .deleteHero(id)
         .pipe(delay(1000))
         .subscribe({
           next: () => {
-            localStorageService.removeHeroesFromStorage(id);
-            const updatedHeroes = localStorageService.getLocalHeroes('heroes');
+            localStorageService.deleteHeroFromStorage(id);
+            const updatedHeroes = localStorageService.getStoredHeroesByKey('heroes');
+
             patchState(store, {
               heroes: updatedHeroes?.heroes || [],
               heroesCount: updatedHeroes?.heroesCount || 0,
               selectedHero: {} as Hero,
               initialLoad: false,
               loading: false,
-              error: null,
+              error: '',
             });
           },
           error: (err) => {
             patchState(store, {
               loading: false,
               initialLoad: false,
-              selectedHero: null,
+              selectedHero: {} as Hero,
               error: `Error deleting hero: ${err}`
             });
           },
@@ -259,17 +274,6 @@ export const HeroesStore = signalStore(
         Pagination.DEFAULT_PAGE,
         Pagination.DEFAULT_LIMIT
       );
-      effect(() => {
-        if (store.initialLoad()) {
-          localStorage.setItem(
-            'heroes',
-            JSON.stringify({
-              heroes: store.heroes(),
-              heroesCount: store.heroesCount(),
-            })
-          );
-        }
-      });
     },
   })
 );

@@ -39,6 +39,7 @@ import {
   SnackBarPosition,
   SnackBarType,
 } from '../../../core/enums/snack-bar.enum';
+import { UppercaseDirective } from '../../../core/directives/uppercase.directive';
 
 @Component({
   selector: 'app-edit-hero',
@@ -51,7 +52,8 @@ import {
     MatIconModule,
     MatButtonModule,
     MatCheckboxModule,
-    ButtonBackComponent
+    ButtonBackComponent,
+    UppercaseDirective,
 ],
   templateUrl: './edit-hero.component.html',
   styleUrls: ['./edit-hero.component.scss'],

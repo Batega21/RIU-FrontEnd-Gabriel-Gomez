@@ -1,4 +1,4 @@
-import { ComponentFixture, fakeAsync, TestBed, tick } from '@angular/core/testing';
+import { ComponentFixture, fakeAsync, flush, TestBed, tick } from '@angular/core/testing';
 
 import { EditHeroComponent } from './edit-hero.component';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
@@ -11,7 +11,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
 import { SnackBarType } from '../../../core/enums/snack-bar.enum';
 import { HEROES_MOCK } from '../../../core/constant/heroes.constant';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { HeroPowers } from '../../../core/enums/powers.enum';
 import { Component } from '@angular/core';
 
@@ -94,13 +94,15 @@ describe('EditHeroComponent', () => {
   it('should set hero data when hero is fetched', fakeAsync(() => {
     const heroId = HEROES_MOCK[0].id;
     const store = TestBed.inject(HeroesStore);
-
+    const heroService = TestBed.inject(HeroService);
+    
+    spyOn(heroService, 'getHeroById').and.returnValue(of(mockHeroes[0]));
     fixture.componentRef.setInput('id', heroId);
     fixture.detectChanges();
     spyOn(store, 'getHeroById').and.callThrough();
     store.getHeroById(heroId);
 
-    tick(1000);
+    flush();
 
     expect(store.getHeroById).toHaveBeenCalledWith(heroId);
     expect(component.hero().id).toBe(heroId);
@@ -108,22 +110,22 @@ describe('EditHeroComponent', () => {
     expect(component.heroForm.valid).toBeTrue();
   }));
 
-  it('should navigate to hero list if attemptedFetch is false', fakeAsync(() => {
-    const heroId = 999;
-    const store = TestBed.inject(HeroesStore);
-    const router = TestBed.inject(Router);
-    spyOn(store, 'getHeroById').and.callThrough();
-    spyOn(store, 'selectedHero').and.returnValue(null);
-    spyOn(router, 'navigate');
+  it('should navigate to hero list if fetching fails', fakeAsync(() => {
+  const store = TestBed.inject(HeroesStore);
+  const router = TestBed.inject(Router);
+  const heroService = TestBed.inject(HeroService);
+  const heroId = 999;
 
-    fixture.componentRef.setInput('id', heroId);
-    fixture.detectChanges();
+  spyOn(heroService, 'getHeroById').and.returnValue(throwError(() => new Error('Hero not found')));
+  spyOn(router, 'navigate');
 
-    tick();
+  fixture.componentRef.setInput('id', heroId);
+  fixture.detectChanges();
 
-    expect(router.navigate).toHaveBeenCalledWith(['/hero']);
-    expect(store.getHeroById).toHaveBeenCalledWith(heroId);
-    expect(component.error).toBe('Hero not found');
+  store.getHeroById(heroId);
+  flush();
+
+  expect(router.navigate).toHaveBeenCalledWith(['/hero']);
   }));
 
   it('should call openNotification with correct parameters', () => {

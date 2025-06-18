@@ -1,77 +1,95 @@
-import { Injectable } from '@angular/core';
+import { Injectable, signal } from '@angular/core';
 import { Hero, HeroesPaginated } from '../interfaces/hero';
 
 @Injectable({
   providedIn: 'root'
 })
 export class LocalStorageService {
+  public key: string = 'heroes';
 
-  constructor() { }
+  public addHeroesInStorage(heroData: HeroesPaginated): void {
+    heroData?.heroes?.forEach(hero => {
+      if (hero && hero.id) {
+        this.addHeroToStorage(hero, heroData.heroesCount);
+      } else {
+        console.error('Hero data is invalid:', hero);
+      }
+    });
+  }
 
-  public getHeroesFromStorage(page: number, pageSize: number): HeroesPaginated | null {
-    const localHeroes = this.getLocalHeroes('heroes') || { heroes: [], heroesCount: 0 };
+  private updateLocalStorage(heroesPaginated: HeroesPaginated): void {
+    localStorage.setItem(this.key, JSON.stringify(heroesPaginated));
+  }
+
+  public addHeroToStorage(hero: Hero, heroCount: number): void {
+    const localHeroes = this.getStoredHeroesByKey(this.key) || { heroes: [], heroesCount: 0 };
+    
+    if (this.isHeroInStorage(hero.id)) {
+      console.warn(`Hero with id ${hero.id} already exists in local storage.`);
+      return;
+    }
+
+    localHeroes.heroes.push(hero);
+    localHeroes.heroesCount = localHeroes.heroes.length;
+    this.updateLocalStorage(localHeroes);
+  }
+
+  public getLocalHeroesPaginated(page: number, pageSize: number): HeroesPaginated | null {
+    const localHeroes = this.getStoredHeroesByKey(this.key) || { heroes: [], heroesCount: 0 };
     const startIndex = (page - 1) * pageSize;
 
     if (localHeroes.heroesCount > 0) {
       const heroes = localHeroes['heroes'].slice(startIndex, startIndex + pageSize);
-      const setHeroesInStorage: HeroesPaginated = {
+      const addHeroesInStorage: HeroesPaginated = {
         heroes: heroes,
         heroesCount: localHeroes.heroesCount
       }
-      return setHeroesInStorage;
+      return addHeroesInStorage;
     } else {
       return null;
     }
   }
 
-  public setHeroesInStorage(heroData: HeroesPaginated): void {
-    const key = 'heroes';
-    const value: HeroesPaginated = {
-      heroes: heroData.heroes,
-      heroesCount: heroData.heroesCount,
-    };
-    localStorage.setItem(key, JSON.stringify(value));
+  public updateStorage(hero: Hero): void {
+    const localHeroes = this.getStoredHeroesByKey(this.key) || { heroes: [], heroesCount: 0 };
+    if (this.isHeroInStorage(hero.id)) {
+      const updatedHeroes = localHeroes.heroes.map(localHero => localHero.id === hero.id ? hero : localHero);
+      localHeroes.heroes = updatedHeroes;
+    } else {
+      localHeroes.heroes.unshift(hero);
+      localHeroes.heroesCount = localHeroes.heroes.length;
+    }
+    this.updateLocalStorage(localHeroes);
   }
 
-  public getLocalHeroes(key: string): HeroesPaginated | null {
-    const cachedHeroes = localStorage.getItem(key);
-    if (!cachedHeroes) {
-      console.error(`Error getting item from localStorage: ${key}`);
-      return null;
+  public getStoredHeroesByKey(key: string): HeroesPaginated | null {
+    if (key && key === this.key) {
+      const storedHeroes: HeroesPaginated = JSON.parse(localStorage.getItem(key) as string) || null;
+      if (!storedHeroes) {
+        return null;
+      } else {
+        return storedHeroes;
+      }
     } else {
-      return JSON.parse(cachedHeroes);
+      return null;
     }
   }
 
-  public removeHeroesFromStorage(id: number): void {
-    const localHeroes = this.getLocalHeroes('heroes') || { heroes: [], heroesCount: 0 };
-    if (localHeroes.heroesCount > 0) {
+  public deleteHeroFromStorage(id: number): void {
+    if (id && this.isHeroInStorage(id)) {
+      const localHeroes = this.getStoredHeroesByKey(this.key) || { heroes: [], heroesCount: 0 };
       const updatedHeroes = localHeroes.heroes.filter(hero => hero.id !== id);
       localHeroes.heroes = updatedHeroes;
       localHeroes.heroesCount = updatedHeroes.length;
-      this.setHeroesInStorage(localHeroes);
+      this.updateLocalStorage(localHeroes);
     } else {
-      console.warn(`No heroes found in local storage to remove with id: ${id}`);
+      console.warn(`Hero with id:${id} does not exist in local storage.`);
     }
   }
 
-  public addHeroToStorage(hero: Hero): void {
-    const localHeroes = this.getLocalHeroes('heroes') || { heroes: [], heroesCount: 0 };
-    if (localHeroes.heroesCount > 0) {
-      const existingHero = localHeroes.heroes.find(h => h.id === hero.id);
-      if (!existingHero) {
-        localHeroes.heroes.push(hero);
-        localHeroes.heroesCount++;
-        this.setHeroesInStorage(localHeroes);
-      } else {
-        console.warn(`Hero with id ${hero.id} already exists in local storage.`);
-      }
-    } else {
-      const newHeroes: HeroesPaginated = {
-        heroes: [hero],
-        heroesCount: 1
-      };
-      this.setHeroesInStorage(newHeroes);
-    }
+  private isHeroInStorage(id: number): boolean {
+    const localHeroes = this.getStoredHeroesByKey(this.key) || { heroes: [], heroesCount: 0 };
+    const isHero = localHeroes.heroes.some(hero => hero.id === id);
+    return isHero;
   }
 }
